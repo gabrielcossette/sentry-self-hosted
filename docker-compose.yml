@@ -62,9 +62,9 @@ x-sentry-defaults: &sentry_defaults
     OPENAI_API_KEY:
   volumes:
     - "sentry-data:/data"
-    - "./sentry:/etc/sentry"
-    - "./geoip:/geoip:ro"
-    - "./certificates:/usr/local/share/ca-certificates:ro"
+    - "sentry-sentry:/etc/sentry"
+    - "sentry-geoip:/geoip:ro"
+    - "sentry-certificates:/usr/local/share/ca-certificates:ro"
 x-snuba-defaults: &snuba_defaults
   <<: *restart_policy
   depends_on:
@@ -183,10 +183,7 @@ services:
     volumes:
       - "sentry-clickhouse:/var/lib/clickhouse"
       - "sentry-clickhouse-log:/var/log/clickhouse-server"
-      - type: bind
-        read_only: true
-        source: ./clickhouse/config.xml
-        target: /etc/clickhouse-server/config.d/sentry.xml
+      - "sentry-clickhouse-config:/etc/clickhouse-server/config.d/"
     environment:
       # This limits Clickhouse's memory to 30% of the host memory
       # If you have high volume and your search return incomplete results
@@ -211,7 +208,7 @@ services:
     entrypoint:
       ["/usr/bin/geoipupdate", "-d", "/sentry", "-f", "/sentry/GeoIP.conf"]
     volumes:
-      - "./geoip:/sentry"
+      - "sentry-geoip:/sentry"
   snuba-api:
     <<: *snuba_defaults
   # Kafka consumer responsible for feeding events into Clickhouse
@@ -310,10 +307,7 @@ services:
     image: "$SYMBOLICATOR_IMAGE"
     volumes:
       - "sentry-symbolicator:/data"
-      - type: bind
-        read_only: true
-        source: ./symbolicator
-        target: /etc/symbolicator
+      - "sentry-symbolicator2:/etc/symbolicator"
     command: run -c /etc/symbolicator/config.yml
   symbolicator-cleanup:
     <<: *restart_policy
@@ -455,10 +449,7 @@ services:
       - "$SENTRY_BIND:80/tcp"
     image: "nginx:1.25.4-alpine"
     volumes:
-      - type: bind
-        read_only: true
-        source: ./nginx
-        target: /etc/nginx
+      - sentry-nginx:/etc/nginx
       - sentry-nginx-cache:/var/cache/nginx
       - sentry-nginx-www:/var/www
     depends_on:
@@ -468,14 +459,8 @@ services:
     <<: *restart_policy
     image: "$RELAY_IMAGE"
     volumes:
-      - type: bind
-        read_only: true
-        source: ./relay
-        target: /work/.relay
-      - type: bind
-        read_only: true
-        source: ./geoip
-        target: /geoip
+      - "sentry-relay:/work/.relay"
+      - "sentry-geoip:/geoip"
     depends_on:
       kafka:
         <<: *depends_on-healthy
@@ -545,3 +530,10 @@ volumes:
   sentry-kafka-log:
   sentry-smtp-log:
   sentry-clickhouse-log:
+  sentry-sentry:
+  sentry-geoip:
+  sentry-certificates:
+  sentry-relay:
+  sentry-nginx:
+  sentry-symbolicator2:
+  sentry-clickhouse-config:
